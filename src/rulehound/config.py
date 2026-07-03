@@ -63,6 +63,10 @@ def load_config(path: str | Path | None = None) -> Config:
 
     Missing file or missing keys fall back to defaults. Relative paths in
     [paths] are resolved against the config file's directory.
+
+    If $RULEHOUND_DATA_DIR is set (e.g. a mounted volume path on a hosting
+    platform), it overrides the entire [paths] section — all derived data
+    lives under that one root instead of paths configured in config.toml.
     """
     if path is None:
         path = os.environ.get("RULEHOUND_CONFIG") or "config.toml"
@@ -76,14 +80,25 @@ def load_config(path: str | Path | None = None) -> Config:
 
     cfg = Config()
 
-    p = raw.get("paths", {})
-    cfg.paths = PathsConfig(
-        data_dir=base / p.get("data_dir", "data"),
-        raw_dir=base / p.get("raw_dir", "data/raw"),
-        pages_dir=base / p.get("pages_dir", "data/pages"),
-        crops_dir=base / p.get("crops_dir", "data/crops"),
-        db_path=base / p.get("db_path", "data/rulehound.db"),
-    )
+    data_dir_override = os.environ.get("RULEHOUND_DATA_DIR")
+    if data_dir_override:
+        root = Path(data_dir_override)
+        cfg.paths = PathsConfig(
+            data_dir=root,
+            raw_dir=root / "raw",
+            pages_dir=root / "pages",
+            crops_dir=root / "crops",
+            db_path=root / "rulehound.db",
+        )
+    else:
+        p = raw.get("paths", {})
+        cfg.paths = PathsConfig(
+            data_dir=base / p.get("data_dir", "data"),
+            raw_dir=base / p.get("raw_dir", "data/raw"),
+            pages_dir=base / p.get("pages_dir", "data/pages"),
+            crops_dir=base / p.get("crops_dir", "data/crops"),
+            db_path=base / p.get("db_path", "data/rulehound.db"),
+        )
 
     e = raw.get("embedding", {})
     cfg.embedding = EmbeddingConfig(

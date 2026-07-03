@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from rulehound.config import load_config
@@ -28,6 +29,17 @@ def test_config_from_file(tmp_path: Path) -> None:
     assert cfg.embedding.dimension == 128
     assert cfg.search.top_k == 3
     assert cfg.paths.db_path == tmp_path / "data/rulehound.db"
+
+
+def test_data_dir_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Railway (and most PaaS) mount a persistent volume at a chosen path;
+    # this env var points all derived data at it regardless of config.toml.
+    (tmp_path / "config.toml").write_text('[paths]\ndata_dir = "should-be-ignored"\n')
+    monkeypatch.setenv("RULEHOUND_DATA_DIR", str(tmp_path / "volume"))
+    cfg = load_config(tmp_path / "config.toml")
+    assert cfg.paths.data_dir == tmp_path / "volume"
+    assert cfg.paths.db_path == tmp_path / "volume" / "rulehound.db"
+    assert cfg.paths.crops_dir == tmp_path / "volume" / "crops"
 
 
 def test_schema_applies(tmp_path: Path) -> None:

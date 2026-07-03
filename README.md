@@ -71,6 +71,43 @@ against the real PDF. Gate: hybrid Recall@3 ≥ 0.90.
 CI never touches GW content: tests build their own hand-made fixture PDF.
 Never commit the PDF, page renders, crops, or the DB (`data/` is gitignored).
 
+## Deploying to Railway
+
+The app is a single container: a `Dockerfile` builds it, `railway.json`
+points Railway at it and wires up the health check. Data (the SQLite DB,
+page renders, crops, the uploaded PDF) must live on a Railway **volume** —
+containers are otherwise wiped on every redeploy.
+
+1. **Create the Railway project** and point it at this repo (Railway
+   dashboard → New Project → Deploy from GitHub repo → pick this repo/branch).
+   Railway auto-detects `railway.json` and builds via the `Dockerfile`.
+2. **Add a volume** to the service (service → Settings → Volumes → New
+   Volume). Mount path: `/data` (any path works, just be consistent with
+   step 3).
+3. **Set environment variables** on the service (Settings → Variables):
+   - `RULEHOUND_DATA_DIR=/data` — points the DB, page renders, crops, and
+     uploaded PDF at the mounted volume instead of the container's
+     ephemeral filesystem. (`PORT` is injected by Railway automatically —
+     don't set it yourself.)
+4. **Deploy.** Railway builds the image (this bakes in the bge-small
+   embedding model at build time, so cold starts don't need network access
+   to Hugging Face) and starts it; `/health` is polled until it's up.
+5. **Upload your Core Rules PDF** through the running app's UI (the same
+   upload control used locally) — this triggers ingest on the volume, so it
+   survives future redeploys without re-uploading.
+
+If you'd rather skip the embeddings extra (much faster build, smaller
+image, keyword-only search — no semantic/paraphrase matching), remove
+`--extra embeddings` from the `RUN uv sync` line in the `Dockerfile` and the
+model pre-download step below it.
+
+**Image size note:** the Dockerfile pins `torch` to the CPU-only wheel
+index (`download.pytorch.org/whl/cpu`) via `[tool.uv.sources]` in
+`pyproject.toml`. Without that pin, the default PyPI `torch` wheel for Linux
+pulls the full CUDA toolchain (~5 GB of `nvidia-*` packages) that a
+CPU-only Railway container never uses — don't remove the pin unless you
+also remove `torch` from the `embeddings` extra.
+
 ## Layout
 
 Matches the design doc §3: `src/rulehound/{ingest,store,search,api}`,

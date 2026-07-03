@@ -1,0 +1,13 @@
+# Never bake GW content or derived data into the image
+data/
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+uv.lock
+
+.git/
+eval/*.md
+tests/fixtures/*.pdf

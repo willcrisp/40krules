@@ -15,13 +15,28 @@ dependencies = [
 [project.optional-dependencies]
 # Real embedding model (BAAI/bge-small-en-v1.5). Heavy (pulls torch); the app
 # degrades to keyword-only search (or the "hash" test embedder) without it.
-embeddings = ["sentence-transformers>=3.0"]
+embeddings = ["sentence-transformers>=3.0", "torch>=2.0"]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",
 ]
+
+[tool.uv.sources]
+# CPU-only torch: the default PyPI wheel for linux pulls the full CUDA
+# toolchain (~5GB of nvidia-* packages) that a CPU-only container never
+# uses. Note: this repo's sandboxed dev environment blocks
+# download.pytorch.org, so `uv sync --extra embeddings` cannot be verified
+# end-to-end here — verified only that uv correctly targets this index
+# once torch is declared as a direct dependency. Regular machines and
+# Railway's build environment have normal internet access.
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]
