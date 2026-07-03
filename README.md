@@ -45,6 +45,17 @@ tests). If the configured model can't be loaded, or the DB was embedded with
 a different model than configured, vector search is disabled and keyword
 search keeps working — vector is additive, never load-bearing.
 
+## Typo tolerance
+
+Two layers keep search-as-you-type robust, both inside the latency budget:
+the final query token is FTS5 prefix-matched (`"disemb"*` finds Disembark
+mid-word), and out-of-vocabulary tokens are spell-corrected against a
+vocabulary built from the ingested rules text at ingest time (SymSpell-style
+deletion index, sub-millisecond). Corrections are additive on the keyword
+side and never rewrite words that exist in the corpus, so "embark" can never
+be "corrected" into "disembark". When a correction fires, `/search` returns
+`corrected_query` and the UI shows it.
+
 ## Tests & eval
 
 ```bash

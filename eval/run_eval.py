@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from rulehound.config import load_config  # noqa: E402
 from rulehound.ingest.embed import get_embedder  # noqa: E402
 from rulehound.search.hybrid import hybrid_search, rrf_fuse  # noqa: E402
+from rulehound.search.spell import SpellCorrector  # noqa: E402
 from rulehound.store.sqlite_store import SqliteStore  # noqa: E402
 
 GATE_RECALL_AT_3 = 0.90
@@ -69,20 +70,30 @@ def main() -> int:
         print("DB is empty — run ingest first: python -m rulehound.ingest data/raw/core_rules.pdf")
         return 2
     embedder = get_embedder(cfg.embedding, log=print)
+    vocab = store.load_vocab()
+    corrector = SpellCorrector(vocab) if vocab else None
+
+    def correct(q: str) -> tuple[str, list[str] | None]:
+        if corrector is None:
+            return q, None
+        c = corrector.correct_query(q)
+        return (c.corrected if c.changed else q), list(c.replacements.values()) or None
 
     def hybrid(q: str) -> list[str]:
-        results, _ = hybrid_search(store, embedder, q, cfg.search)
+        results, _, _ = hybrid_search(store, embedder, q, cfg.search, corrector=corrector)
         return [r.rule_id for r in results]
 
     def keyword_only(q: str) -> list[str]:
-        ranked = store.keyword_search(q, cfg.search.candidate_k)
-        fused = rrf_fuse({"keyword": ranked}, q, cfg.search)
+        effective, extra = correct(q)
+        ranked = store.keyword_search(q, cfg.search.candidate_k, extra_terms=extra)
+        fused = rrf_fuse({"keyword": ranked}, effective, cfg.search)
         return [r.rule_id for r in fused[: cfg.search.top_k]]
 
     def vector_only(q: str) -> list[str]:
         if embedder is None:
             return []
-        ranked = store.vector_search(embedder.encode([q])[0], cfg.search.candidate_k)
+        effective, _ = correct(q)
+        ranked = store.vector_search(embedder.encode([effective])[0], cfg.search.candidate_k)
         return [r.rule_id for r in ranked[: cfg.search.top_k]]
 
     runs = {

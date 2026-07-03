@@ -25,4 +25,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS rules_fts USING fts5(
   tokenize='porter unicode61'
 );
 
+-- Corpus vocabulary (title + rule text tokens) for query spell correction
+CREATE TABLE IF NOT EXISTS vocab (term TEXT PRIMARY KEY, freq INTEGER NOT NULL);
+
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);

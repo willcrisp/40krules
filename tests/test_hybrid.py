@@ -14,7 +14,7 @@ CFG = SearchConfig()
 
 
 def top1(store, query: str) -> str:
-    results, _ = hybrid_search(store, HashingEmbedder(384), query, CFG)
+    results, _, _ = hybrid_search(store, HashingEmbedder(384), query, CFG)
     assert results, f"no results for {query!r}"
     return results[0].rule_id.split(".")[-1]
 
@@ -41,10 +41,17 @@ def test_adversarial_embark_vs_disembark(store) -> None:
 
 
 def test_keyword_only_mode_still_works(store) -> None:
-    results, timings = hybrid_search(store, None, "disembark", CFG)
+    results, timings, _ = hybrid_search(store, None, "disembark", CFG)
     assert results[0].rule_id.endswith("disembark")
     assert timings.embed_ms == 0.0
     assert timings.vector_ms == 0.0
+
+
+def test_prefix_match_while_typing(store) -> None:
+    # search-as-you-type: the final token is prefix-matched in FTS5
+    assert top1(store, "disemb") == "disembark"
+    results, _, _ = hybrid_search(store, None, "deep str", CFG)
+    assert results[0].rule_id.endswith("deep-strike")
 
 
 def test_rrf_fusion_combines_sources() -> None:
@@ -64,7 +71,7 @@ def test_title_boost_dominates_rrf() -> None:
 
 
 def test_expansion_on_top_result(store) -> None:
-    results, _ = hybrid_search(store, HashingEmbedder(384), "disembark", CFG)
+    results, _, _ = hybrid_search(store, HashingEmbedder(384), "disembark", CFG)
     related = related_for(store, results[0].rule_id, CFG.related_max)
     assert 0 < len(related) <= CFG.related_max
     for r in related:

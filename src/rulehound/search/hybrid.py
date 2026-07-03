@@ -11,6 +11,7 @@ from ..config import SearchConfig
 from ..ingest.embed import Embedder
 from ..models import ScoredRule
 from ..store.base import SearchStore
+from .spell import Correction, SpellCorrector
 
 _pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="rulehound-search")
 
@@ -78,20 +79,31 @@ def hybrid_search(
     embedder: Embedder | None,
     query: str,
     cfg: SearchConfig,
-) -> tuple[list[FusedResult], Timings]:
-    """Embed, run FTS5 and vector search in parallel, fuse, return top_k."""
+    corrector: SpellCorrector | None = None,
+) -> tuple[list[FusedResult], Timings, Correction | None]:
+    """Spell-correct, embed, run FTS5 and vector search in parallel, fuse.
+
+    Correction is additive on the keyword side (corrected tokens are OR-ed in
+    alongside the originals, so stem matches on the raw input still work) and
+    substitutive for embedding and title boost, where the corrected string is
+    the better representation of intent.
+    """
     t = Timings()
     t0 = time.perf_counter()
+
+    correction = corrector.correct_query(query) if corrector else None
+    effective = correction.corrected if correction and correction.changed else query
+    extra_terms = list(correction.replacements.values()) if correction else None
 
     embedding: list[float] | None = None
     if embedder is not None:
         te = time.perf_counter()
-        embedding = embedder.encode([query])[0]
+        embedding = embedder.encode([effective])[0]
         t.embed_ms = (time.perf_counter() - te) * 1000
 
     def run_keyword() -> list[ScoredRule]:
         tk = time.perf_counter()
-        out = store.keyword_search(query, cfg.candidate_k)
+        out = store.keyword_search(query, cfg.candidate_k, extra_terms=extra_terms)
         t.keyword_ms = (time.perf_counter() - tk) * 1000
         return out
 
@@ -107,6 +119,6 @@ def hybrid_search(
     vec_future = _pool.submit(run_vector)
     ranked = {"keyword": kw_future.result(), "vector": vec_future.result()}
 
-    results = rrf_fuse(ranked, query, cfg)[: cfg.top_k]
+    results = rrf_fuse(ranked, effective, cfg)[: cfg.top_k]
     t.total_ms = (time.perf_counter() - t0) * 1000
-    return results, t
+    return results, t, correction

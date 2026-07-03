@@ -66,3 +66,11 @@ queries:
   - {q: "disembarking from a transport", expect: disembark}
   - {q: "shooting phase", expect: shooting-phase}
   - {q: "movement phase", expect: movement-phase}
+
+  # --- typos (corpus-driven spell correction layer) ---
+  - {q: "dismbark rules", expect: disembark}
+  - {q: "embrak rules", expect: embark}
+  - {q: "deep strke", expect: deep-strike}
+  - {q: "engagment range", expect: engagement-range}
+  - {q: "reserevs", expect: reserves}
+  - {q: "fall bakc", expect: fall-back}

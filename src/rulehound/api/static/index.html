@@ -71,8 +71,9 @@ async function runSearch() {
   if (my !== seq) return;
   const data = await res.json();
   const l = data.latency_ms;
-  $("latency").textContent =
-    `${l.total} ms total · embed ${l.embed} · keyword ${l.keyword} · vector ${l.vector}`;
+  let line = `${l.total} ms total · embed ${l.embed} · keyword ${l.keyword} · vector ${l.vector}`;
+  if (data.corrected_query) line += ` · searched for “${data.corrected_query}”`;
+  $("latency").textContent = line;
   $("results").innerHTML = data.results.length
     ? data.results.map(renderResult).join("")
     : "<p style='opacity:.5'>no matches</p>";

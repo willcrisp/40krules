@@ -53,7 +53,9 @@ def search(request: Request, q: str, k: int = 0) -> dict:
     state = _state(request)
     cfg = state.cfg.search
     t0 = time.perf_counter()
-    fused, timings = hybrid_search(state.store, state.embedder, q, cfg)
+    fused, timings, correction = hybrid_search(
+        state.store, state.embedder, q, cfg, corrector=state.corrector
+    )
     top_n = fused[: k or cfg.top_k]
 
     results = []
@@ -65,7 +67,10 @@ def search(request: Request, q: str, k: int = 0) -> dict:
         results.append(_rule_payload(rule, related=related, score=item.score))
 
     timings.total_ms = (time.perf_counter() - t0) * 1000
-    return {"query": q, "latency_ms": timings.as_dict(), "results": results}
+    payload = {"query": q, "latency_ms": timings.as_dict(), "results": results}
+    if correction and correction.changed:
+        payload["corrected_query"] = correction.corrected
+    return payload
 
 
 @router.get("/rule/{rule_id}")

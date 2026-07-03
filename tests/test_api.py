@@ -34,6 +34,15 @@ def test_search_response_shape(client) -> None:
         assert "related" not in other
 
 
+def test_search_reports_spell_correction(client) -> None:
+    body = client.get("/search", params={"q": "dismbark rules"}).json()
+    assert body["corrected_query"] == "disembark rules"
+    assert body["results"][0]["rule_id"].endswith("disembark")
+    # clean queries carry no correction field
+    clean = client.get("/search", params={"q": "disembark rules"}).json()
+    assert "corrected_query" not in clean
+
+
 def test_crops_are_served(client) -> None:
     res = client.get("/search", params={"q": "disembark"})
     crops = res.json()["results"][0]["crops"]

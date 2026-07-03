@@ -13,7 +13,9 @@ from ..models import RuleChunk, RuleRef, ScoredRule
 
 class SearchStore(Protocol):
     # --- query side (§6) ---
-    def keyword_search(self, query: str, k: int) -> list[ScoredRule]: ...
+    def keyword_search(
+        self, query: str, k: int, extra_terms: list[str] | None = None
+    ) -> list[ScoredRule]: ...
 
     def vector_search(self, embedding: list[float], k: int) -> list[ScoredRule]: ...
 
@@ -29,6 +31,8 @@ class SearchStore(Protocol):
     def store_vectors(
         self, vectors: dict[str, list[float]], model_name: str, dimension: int
     ) -> None: ...
+
+    def load_vocab(self) -> dict[str, int]: ...
 
     def get_meta(self, key: str) -> str | None: ...
 

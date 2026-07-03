@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from ..config import Config, load_config
 from ..ingest import embed
 from ..ingest.pipeline import run_ingest
+from ..search.spell import SpellCorrector
 from ..store import sqlite_store
 from ..store.sqlite_store import SqliteStore
 
@@ -41,6 +42,7 @@ class IngestManager:
         try:
             summary = run_ingest(pdf_path, self.state.cfg, store=self.state.store, force=force, log=log)
             self.state.refresh_embedder()
+            self.state.refresh_corrector()
             self.status.update(state="done", summary=summary, message="ingest complete")
         except Exception as exc:
             traceback.print_exc()
@@ -54,8 +56,10 @@ class AppState:
         self.store = SqliteStore(cfg.paths.db_path, vector_dim=cfg.embedding.dimension)
         self.embedder = None
         self.embedder_error: str | None = None
+        self.corrector: SpellCorrector | None = None
         self.ingest = IngestManager(self)
         self.refresh_embedder()
+        self.refresh_corrector()
 
     def refresh_embedder(self) -> None:
         """Load the embedder once; refuse vector queries on model mismatch (§4.5)."""
@@ -72,6 +76,11 @@ class AppState:
         errors: list[str] = []
         self.embedder = embed.get_embedder(self.cfg.embedding, log=errors.append)
         self.embedder_error = errors[0] if errors else None
+
+    def refresh_corrector(self) -> None:
+        """(Re)build the query spell corrector from the corpus vocabulary."""
+        vocab = self.store.load_vocab()
+        self.corrector = SpellCorrector(vocab) if vocab else None
 
     def close(self) -> None:
         self.store.close()

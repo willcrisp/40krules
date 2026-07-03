@@ -7,6 +7,7 @@ import re
 import sqlite3
 import struct
 import threading
+from collections import Counter
 from importlib import resources
 from pathlib import Path
 
@@ -21,12 +22,21 @@ def _serialize_f32(vec: list[float]) -> bytes:
     return struct.pack(f"{len(vec)}f", *vec)
 
 
-def _fts_query(query: str) -> str:
-    """Sanitise a natural-language query for FTS5: OR of quoted tokens."""
+def _fts_query(query: str, extra_terms: list[str] | None = None) -> str:
+    """Sanitise a natural-language query for FTS5: OR of quoted tokens.
+
+    The final token is prefix-matched (`"disemb"*`) so search-as-you-type
+    finds rules while a word is still being typed. `extra_terms` (e.g.
+    spell-corrected tokens) are OR-ed in additively.
+    """
     tokens = re.findall(r"[A-Za-z0-9]+", query)
-    if not tokens:
+    parts = [f'"{t}"' for t in dict.fromkeys(extra_terms or [])]
+    parts += [f'"{t}"' for t in tokens[:-1]]
+    if tokens:
+        parts.append(f'"{tokens[-1]}"*')
+    if not parts:
         return '""'
-    return " OR ".join(f'"{t}"' for t in tokens)
+    return " OR ".join(parts)
 
 
 class SqliteStore:
@@ -111,6 +121,17 @@ class SqliteStore:
                 "INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)",
                 (META_DOC_HASH, doc_hash),
             )
+            # Corpus vocabulary for query spell correction (titles + rule text,
+            # matching what FTS indexes; commentary is excluded there too).
+            from ..search.spell import tokenize
+
+            counts: Counter[str] = Counter()
+            for c in chunks:
+                counts.update(tokenize(f"{c.title} {c.text}"))
+            cur.execute("DELETE FROM vocab")
+            cur.executemany(
+                "INSERT INTO vocab (term, freq) VALUES (?,?)", counts.items()
+            )
             self.db.commit()
 
     def store_vectors(
@@ -147,8 +168,10 @@ class SqliteStore:
 
     # --- query side --------------------------------------------------------
 
-    def keyword_search(self, query: str, k: int) -> list[ScoredRule]:
-        fts = _fts_query(query)
+    def keyword_search(
+        self, query: str, k: int, extra_terms: list[str] | None = None
+    ) -> list[ScoredRule]:
+        fts = _fts_query(query, extra_terms)
         with self._lock:
             rows = self.db.execute(
                 "SELECT r.rule_id, r.title, bm25(rules_fts) AS rank"
@@ -213,6 +236,11 @@ class SqliteStore:
         with self._lock:
             self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?,?)", (key, value))
             self.db.commit()
+
+    def load_vocab(self) -> dict[str, int]:
+        with self._lock:
+            rows = self.db.execute("SELECT term, freq FROM vocab").fetchall()
+        return {r["term"]: r["freq"] for r in rows}
 
     def rule_count(self) -> int:
         with self._lock:
