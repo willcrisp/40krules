@@ -1,0 +1,68 @@
+# Golden query set (design doc §9): query -> expected rule.
+#
+# `expect` is matched against the FINAL SEGMENT of the returned rule_id
+# (rule_ids are slugs of section paths, e.g.
+# movement-phase.transports.disembark), so the golden set survives
+# re-chunking that changes parent sections. After Phase 1 runs against the
+# real PDF, adjust any slug that the chunk report shows differs.
+#
+# Gate: Recall@3 >= 0.90. run_eval.py also reports keyword-only and
+# vector-only ablations.
+
+queries:
+  # --- direct naming ---
+  - {q: "disembark rules", expect: disembark}
+  - {q: "disembark", expect: disembark}
+  - {q: "embark", expect: embark}
+  - {q: "deep strike", expect: deep-strike}
+  - {q: "deep strike rules", expect: deep-strike}
+  - {q: "reserves", expect: reserves}
+  - {q: "strategic reserves", expect: strategic-reserves}
+  - {q: "engagement range", expect: engagement-range}
+  - {q: "fall back", expect: fall-back}
+  - {q: "fall back move", expect: fall-back}
+  - {q: "advance", expect: advance}
+  - {q: "normal move", expect: normal-move}
+  - {q: "objective control", expect: objective-markers}
+  - {q: "charge phase", expect: charge-phase}
+  - {q: "overwatch", expect: fire-overwatch}
+  - {q: "pile in", expect: pile-in}
+  - {q: "consolidate", expect: consolidation}
+  - {q: "heroic intervention", expect: heroic-intervention}
+  - {q: "battle-shock", expect: battle-shock-tests}
+  - {q: "mortal wounds", expect: mortal-wounds}
+  - {q: "feel no pain", expect: feel-no-pain}
+  - {q: "lone operative", expect: lone-operative}
+  - {q: "stealth", expect: stealth}
+  - {q: "deadly demise", expect: deadly-demise}
+  - {q: "firing deck", expect: firing-deck}
+
+  # --- paraphrase ---
+  - {q: "getting out of a transport", expect: disembark}
+  - {q: "getting into a transport", expect: embark}
+  - {q: "arriving from reserves", expect: reserves}
+  - {q: "units teleporting onto the battlefield", expect: deep-strike}
+  - {q: "how far can a unit move", expect: normal-move}
+  - {q: "moving through walls", expect: movement-and-terrain-features}
+  - {q: "rolling to hit", expect: hit-roll}
+  - {q: "rolling to wound", expect: wound-roll}
+  - {q: "saving throws", expect: saving-throw}
+  - {q: "invulnerable saves", expect: invulnerable-saves}
+  - {q: "allocating wounds to models", expect: allocate-attack}
+  - {q: "re-rolling dice", expect: re-rolls}
+  - {q: "leader joining a unit", expect: leader}
+
+  # --- symptom phrasing ---
+  - {q: "can I shoot after falling back", expect: fall-back}
+  - {q: "can I charge after advancing", expect: advance}
+  - {q: "who controls an objective", expect: objective-markers}
+  - {q: "shooting into melee", expect: big-guns-never-tire}
+  - {q: "what happens when a transport is destroyed", expect: destroyed-transports}
+  - {q: "can models on upper floors be charged", expect: charge-move}
+  - {q: "when do units take battle-shock tests", expect: battle-shock-tests}
+
+  # --- adversarial near-misses (§9: embark/disembark must not swap) ---
+  - {q: "embark rules", expect: embark}
+  - {q: "disembarking from a transport", expect: disembark}
+  - {q: "shooting phase", expect: shooting-phase}
+  - {q: "movement phase", expect: movement-phase}

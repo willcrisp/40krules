@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rulehound</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font: 15px/1.5 system-ui, sans-serif;
+    max-width: 760px; margin: 2rem auto; padding: 0 1rem;
+  }
+  h1 { font-size: 1.2rem; letter-spacing: .04em; }
+  h1 small { font-weight: normal; opacity: .5; font-size: .75rem; }
+  #q {
+    width: 100%; font-size: 1.05rem; padding: .6rem .8rem;
+    border: 1px solid #8884; border-radius: 8px; background: transparent; color: inherit;
+  }
+  #latency { font-size: .78rem; opacity: .55; margin: .4rem 0 0; min-height: 1.2em; }
+  .result { border: 1px solid #8883; border-radius: 8px; padding: .8rem 1rem; margin: .8rem 0; }
+  .result h2 { font-size: 1rem; margin: 0; }
+  .path { font-size: .75rem; opacity: .55; margin: .1rem 0 .5rem; }
+  .text { white-space: pre-wrap; margin: 0; }
+  details { margin-top: .5rem; font-size: .9rem; }
+  details summary { cursor: pointer; opacity: .7; }
+  .crops img { max-width: 100%; border: 1px solid #8883; border-radius: 4px; margin-top: .5rem; display: block; }
+  .related { margin-top: .6rem; }
+  .related a {
+    display: inline-block; font-size: .78rem; padding: .1rem .5rem; margin: 0 .3rem .3rem 0;
+    border: 1px solid #8885; border-radius: 999px; text-decoration: none; color: inherit;
+  }
+  #ingest {
+    margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #8883;
+    font-size: .85rem; opacity: .9;
+  }
+  #ingest button { padding: .3rem .8rem; border-radius: 6px; border: 1px solid #8885; background: transparent; color: inherit; cursor: pointer; }
+  #ingest-status { margin-top: .4rem; font-size: .78rem; opacity: .65; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<h1>RULEHOUND <small>verbatim rules retrieval</small></h1>
+
+<input id="q" type="search" placeholder="what are the rules for disembarking…" autofocus autocomplete="off">
+<p id="latency"></p>
+<div id="results"></div>
+
+<section id="ingest">
+  <input type="file" id="pdf" accept=".pdf">
+  <button id="upload">Upload &amp; build embeddings</button>
+  <button id="rebuild" title="Re-run ingest + embeddings on the last uploaded PDF">Rebuild embeddings</button>
+  <div id="ingest-status"></div>
+</section>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => (s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let timer = null, seq = 0;
+
+$("q").addEventListener("input", () => {
+  clearTimeout(timer);
+  timer = setTimeout(runSearch, 200);
+});
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(timer); runSearch(); } });
+
+async function runSearch() {
+  const q = $("q").value.trim();
+  const my = ++seq;
+  if (!q) { $("results").innerHTML = ""; $("latency").textContent = ""; return; }
+  const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+  if (my !== seq) return;
+  const data = await res.json();
+  const l = data.latency_ms;
+  $("latency").textContent =
+    `${l.total} ms total · embed ${l.embed} · keyword ${l.keyword} · vector ${l.vector}`;
+  $("results").innerHTML = data.results.length
+    ? data.results.map(renderResult).join("")
+    : "<p style='opacity:.5'>no matches</p>";
+}
+
+function renderResult(r) {
+  const related = (r.related || []).map(x =>
+    `<a href="#" data-rid="${esc(x.rule_id)}" onclick="return showRule(this.dataset.rid)">${esc(x.title)}</a>`).join("");
+  const crops = (r.crops || []).map(c => `<img loading="lazy" src="${esc(c)}">`).join("");
+  return `<div class="result">
+    <h2>${esc(r.title)}</h2>
+    <div class="path">${esc(r.section_path)}</div>
+    <p class="text">${esc(r.text)}</p>
+    ${r.commentary ? `<details><summary>commentary</summary><p class="text">${esc(r.commentary)}</p></details>` : ""}
+    ${crops ? `<details class="crops" open><summary>page image</summary>${crops}</details>` : ""}
+    ${related ? `<div class="related">${related}</div>` : ""}
+  </div>`;
+}
+
+async function showRule(id) {
+  const res = await fetch(`/rule/${encodeURIComponent(id)}`);
+  if (res.ok) {
+    const r = await res.json();
+    r.related = (r.neighbours?.outgoing || []).slice(0, 4);
+    $("results").innerHTML = renderResult(r);
+    $("latency").textContent = r.rule_id;
+  }
+  return false;
+}
+
+$("upload").addEventListener("click", async () => {
+  const f = $("pdf").files[0];
+  if (!f) { $("ingest-status").textContent = "choose a PDF first"; return; }
+  const body = new FormData();
+  body.append("file", f);
+  const res = await fetch("/ingest", { method: "POST", body });
+  $("ingest-status").textContent = res.ok ? "ingest started…" : (await res.json()).detail;
+  if (res.ok) pollIngest();
+});
+
+$("rebuild").addEventListener("click", async () => {
+  const res = await fetch("/ingest/rebuild", { method: "POST" });
+  $("ingest-status").textContent = res.ok ? "rebuild started…" : (await res.json()).detail;
+  if (res.ok) pollIngest();
+});
+
+async function pollIngest() {
+  const res = await fetch("/ingest/status");
+  const s = await res.json();
+  $("ingest-status").textContent = `${s.state}: ${s.message}`;
+  if (s.state === "running") setTimeout(pollIngest, 800);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Never commit GW content or derived data (design doc §10 agent constraints)
+data/
+tests/fixtures/*.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+uv.lock

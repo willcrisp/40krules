@@ -1,0 +1,32 @@
+# Rulehound configuration (design doc §3)
+
+[paths]
+data_dir = "data"
+raw_dir = "data/raw"
+pages_dir = "data/pages"
+crops_dir = "data/crops"
+db_path = "data/rulehound.db"
+
+[embedding]
+# "BAAI/bge-small-en-v1.5" (default, needs the `embeddings` extra),
+# "hash" (deterministic lexical fallback, no ML deps), or any
+# sentence-transformers model name. Dimension must match the model.
+model = "BAAI/bge-small-en-v1.5"
+dimension = 384
+
+[search]
+top_k = 5
+candidate_k = 20
+rrf_k = 60
+# RRF scores are on the order of 1/rrf_k (~0.016), so title boosts sit above
+# the max attainable fused score to make title hits dominate (design doc §6).
+title_exact_boost = 0.05
+title_prefix_boost = 0.02
+related_max = 4
+
+[images]
+dpi = 150
+crop_padding_px = 12
+
+[chunking]
+max_tokens = 1200
