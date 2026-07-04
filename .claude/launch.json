@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "rulehound-api",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "rulehound.api", "--port", "8001"],
+      "port": 8001
+    }
+  ]
+}
