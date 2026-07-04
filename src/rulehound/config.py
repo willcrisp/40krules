@@ -75,7 +75,7 @@ def load_config(path: str | Path | None = None) -> Config:
     raw: dict = {}
     base = Path.cwd()
     if path.is_file():
-        raw = tomllib.loads(path.read_text())
+        raw = tomllib.loads(path.read_text(encoding="utf-8"))
         base = path.resolve().parent
 
     cfg = Config()

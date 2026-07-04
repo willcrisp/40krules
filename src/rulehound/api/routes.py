@@ -45,7 +45,7 @@ def _rule_payload(rule: RuleChunk, related: list[dict] | None = None, score: flo
 
 @router.get("/", response_class=HTMLResponse)
 def index() -> str:
-    return _INDEX_HTML.read_text()
+    return _INDEX_HTML.read_text(encoding="utf-8")
 
 
 @router.get("/search")

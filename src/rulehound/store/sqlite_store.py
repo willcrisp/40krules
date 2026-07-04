@@ -63,7 +63,7 @@ class SqliteStore:
             return False
 
     def _apply_schema(self) -> None:
-        schema = resources.files("rulehound.store").joinpath("schema.sql").read_text()
+        schema = resources.files("rulehound.store").joinpath("schema.sql").read_text(encoding="utf-8")
         with self._lock:
             self.db.executescript(schema)
             if self.vector_enabled:
