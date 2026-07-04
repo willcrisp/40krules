@@ -21,6 +21,10 @@ RUN uv run python -c "from sentence_transformers import SentenceTransformer as S
 
 ENV PATH="/app/.venv/bin:${PATH}"
 
+# __main__.py defaults to 127.0.0.1 (safe for local dev) — override so the
+# health check and external traffic can actually reach the process.
+ENV RULEHOUND_HOST=0.0.0.0
+
 # Railway (and most PaaS) inject $PORT at runtime; __main__.py reads it.
 EXPOSE 8000
 
