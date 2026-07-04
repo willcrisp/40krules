@@ -21,6 +21,7 @@
     --mark-bg: rgba(201, 165, 90, .18);
     --heading: "Avenir Next Condensed", "Arial Narrow", "Roboto Condensed",
                "Helvetica Neue", system-ui, sans-serif;
+    --content-w: 900px;
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
@@ -41,7 +42,7 @@
     border-bottom: 1px solid var(--line);
     padding: calc(.6rem + env(safe-area-inset-top)) 1rem .7rem;
   }
-  .header-inner { max-width: 720px; margin: 0 auto; position: relative; }
+  .header-inner { max-width: var(--content-w); margin: 0 auto; position: relative; }
   .brand {
     display: flex; align-items: center; justify-content: space-between; gap: .6rem;
     margin: 0 0 .55rem;
@@ -95,14 +96,14 @@
     cursor: pointer; display: none;
   }
   #meta {
-    max-width: 720px; margin: .45rem auto 0;
+    max-width: var(--content-w); margin: .45rem auto 0;
     font: .72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
     color: var(--ink-dim); min-height: 1.1em;
   }
   #meta b { color: var(--gold); font-weight: 600; }
 
   /* ---- results ---- */
-  main { max-width: 720px; margin: 0 auto; padding: .9rem 1rem 3rem; }
+  main { max-width: var(--content-w); margin: 0 auto; padding: .9rem 1rem 3rem; }
   .hint { color: var(--ink-dim); text-align: center; padding: 2.5rem 1rem; font-size: .95rem; }
   .back {
     display: inline-block; margin-bottom: .8rem;
@@ -130,7 +131,12 @@
     color: var(--ink-dim); margin: .25rem 0 .7rem;
   }
   .path span { color: var(--gold-dim); }
-  .text { white-space: pre-wrap; margin: 0; font-size: 1rem; }
+  .text { margin: 0; font-size: 1rem; }
+  .text p { margin: 0 0 .75rem; }
+  .text ul { margin: .15rem 0 .85rem; padding-left: 1.15rem; }
+  .text li { margin: 0 0 .5rem; padding-left: .15rem; }
+  .text li::marker { color: var(--gold); }
+  .text p:last-child, .text ul:last-child, .text li:last-child { margin-bottom: 0; }
   mark {
     background: var(--mark-bg);
     color: var(--ink);
@@ -311,6 +317,47 @@ function hl(raw) {
   return out + esc(raw.slice(last));
 }
 
+/* ---- rich text formatting ---------------------------------------------
+   Rule text comes from PDF block extraction: each paragraph is separated
+   by a blank line, but hanging-indent bullets and wrapped lines often get
+   split into extra same-blank-line-separated fragments. We rejoin any
+   fragment that doesn't end in terminal punctuation into the next one,
+   collapse the PDF's hard line-wraps back into flowing prose, and turn
+   recognised bullet glyphs into a real <ul>. */
+const BULLET_RE = /^[▪▫►•●‣◦▶■]\s*/;
+const OPEN_ENDED_RE = /[.!?:"'’”)\]]$/;
+
+function splitParagraphs(raw) {
+  const cleaned = (raw ?? "").replace(/[\x00-\x09\x0B-\x1F]/g, "");
+  const fragments = cleaned
+    .split(/\n\s*\n+/)
+    .map(p => p.replace(/\s*\n\s*/g, " ").trim())
+    .filter(Boolean);
+
+  const paras = [];
+  for (const frag of fragments) {
+    const isBullet = BULLET_RE.test(frag);
+    const prev = paras[paras.length - 1];
+    if (prev && !isBullet && !OPEN_ENDED_RE.test(prev.text)) {
+      prev.text += " " + frag;
+    } else {
+      paras.push({ bullet: isBullet, text: frag.replace(BULLET_RE, "") });
+    }
+  }
+  return paras;
+}
+
+function formatText(raw) {
+  let html = "", inList = false;
+  for (const p of splitParagraphs(raw)) {
+    if (p.bullet && !inList) { html += "<ul>"; inList = true; }
+    if (!p.bullet && inList) { html += "</ul>"; inList = false; }
+    const tag = p.bullet ? "li" : "p";
+    html += `<${tag}>${hl(p.text)}</${tag}>`;
+  }
+  return inList ? html + "</ul>" : html;
+}
+
 /* ---- search ----------------------------------------------------------- */
 $("q").addEventListener("input", () => {
   $("clear").style.display = $("q").value ? "block" : "none";
@@ -368,8 +415,8 @@ function renderResult(r, top = false, backLink = false) {
   <article class="result${top ? " top" : ""}">
     <h2>${hl(r.title)}</h2>
     <div class="path">${path}</div>
-    <p class="text">${hl(r.text)}</p>
-    ${r.commentary ? `<details><summary>Commentary</summary><p class="text">${hl(r.commentary)}</p></details>` : ""}
+    <div class="text">${formatText(r.text)}</div>
+    ${r.commentary ? `<details><summary>Commentary</summary><div class="text">${formatText(r.commentary)}</div></details>` : ""}
     ${crops ? `<details class="crops" open><summary>Page image</summary>${crops}</details>` : ""}
     ${related ? `<div class="related">${related}</div>` : ""}
   </article>`;
