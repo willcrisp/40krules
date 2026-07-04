@@ -12,6 +12,12 @@ schema, phased execution plan, deliberate deferrals) lives in
 [`DESIGN.md`](DESIGN.md) — read it before making architectural changes;
 this file only covers what's needed to work in the code day to day.
 
+A second corpus — faction **datasheets** (unit stat profiles + weapon
+profiles, uploaded per faction, searched across all factions) — is under
+construction. The store layer exists (`store/datasheet_store.py`, see
+Storage below); its ingest pipeline (PDF stat-table parsing), API routes,
+and UI tab do not exist yet.
+
 ## Commands
 
 ```bash
@@ -31,10 +37,12 @@ uv run python eval/run_eval.py        # Recall@1/3 + MRR, hybrid vs keyword-only
 
 There is no lint/format command configured yet.
 
-**Never commit `data/`** (raw PDF, page renders, crops, the SQLite DB) — it's
-Games Workshop IP and is gitignored/dockerignored. Every test builds its own
-hand-made synthetic fixture PDF (`tests/fixtures/build_fixture.py`); CI must
-never touch real GW content.
+**Never commit `data/`** (raw PDF, page renders, crops, the SQLite DBs) —
+it's Games Workshop IP and is gitignored/dockerignored. Tests only ever use
+synthetic content: a hand-made fixture PDF (`tests/fixtures/build_fixture.py`)
+for the rules corpus, hand-built invented units/factions for the datasheet
+store tests (`tests/test_datasheet_store.py`). CI must never touch real GW
+content.
 
 ## Architecture
 
@@ -68,13 +76,27 @@ computed from chunks → DB rows → vectors).
 ### Storage (`src/rulehound/store/`)
 
 Everything above the `SearchStore` Protocol (`base.py`) is store-agnostic.
-`sqlite_store.py` is the only real implementation (SQLite FTS5 for BM25 +
+`sqlite_store.py` implements it for the rules corpus (SQLite FTS5 for BM25 +
 the `sqlite-vec` extension for vectors, one file). `turbopuffer_store.py` is
 a deliberate stub (`raise NotImplementedError`) — the intended production
 swap when this stops being single-user/local; don't implement it unless
 asked. The DB also stores an embedding-model fingerprint in `meta`; if the
 configured model doesn't match what the DB was embedded with, vector search
 is refused and keyword search keeps working (`app.py::AppState.refresh_embedder`).
+
+`datasheet_store.py` is the datasheet corpus's store — a **separate DB
+file** (schema in `datasheet_schema.sql`) so a datasheet ingest can never
+touch the rules index, and with different replace semantics: where
+`sqlite_store.replace_document` wipes the whole singleton corpus,
+`DatasheetStore.replace_faction` scopes deletes to one faction, so
+per-faction uploads are additive (it also purges that faction's vectors
+explicitly — SQLite reuses rowids after DELETE, and stale embeddings would
+silently attach to new units). Units keep `parse_confidence` + `raw_text`
+so a unit whose stat table fails structured parsing stays stored and
+text-searchable rather than being dropped. `store.units` / `store.weapons`
+are search surfaces shaped like `SearchStore`'s query side, so
+`hybrid_search` runs against either unchanged; the datasheet vocab is a
+separate table so unit-name spell correction never mixes with rules prose.
 
 ### Search (`src/rulehound/search/`)
 
