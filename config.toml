@@ -25,7 +25,8 @@ title_prefix_boost = 0.02
 related_max = 4
 
 [images]
-dpi = 150
+# 200dpi keeps crops crisp on 2–3x mobile screens (150 was visibly soft)
+dpi = 200
 crop_padding_px = 12
 
 [chunking]

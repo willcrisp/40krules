@@ -40,7 +40,7 @@ class SearchConfig:
 
 @dataclass
 class ImagesConfig:
-    dpi: int = 150
+    dpi: int = 200
     crop_padding_px: int = 12
 
 

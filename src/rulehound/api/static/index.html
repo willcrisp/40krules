@@ -2,95 +2,352 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0c11">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🐕</text></svg>">
 <title>Rulehound</title>
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: dark;
+    --bg: #0d0c11;
+    --surface: #16151d;
+    --surface-2: #1d1c26;
+    --line: #2a2836;
+    --ink: #e9e4d6;          /* bone */
+    --ink-dim: #9a94a6;
+    --gold: #c9a55a;
+    --gold-dim: #8f7a4d;
+    --red: #b23830;
+    --mark-bg: rgba(201, 165, 90, .18);
+    --heading: "Avenir Next Condensed", "Arial Narrow", "Roboto Condensed",
+               "Helvetica Neue", system-ui, sans-serif;
+  }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    font: 15px/1.5 system-ui, sans-serif;
-    max-width: 760px; margin: 2rem auto; padding: 0 1rem;
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding-bottom: env(safe-area-inset-bottom);
   }
-  h1 { font-size: 1.2rem; letter-spacing: .04em; }
-  h1 small { font-weight: normal; opacity: .5; font-size: .75rem; }
+
+  /* ---- sticky search header ---- */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: calc(.6rem + env(safe-area-inset-top)) 1rem .7rem;
+  }
+  .header-inner { max-width: 720px; margin: 0 auto; }
+  .brand {
+    display: flex; align-items: baseline; gap: .6rem;
+    margin: 0 0 .55rem;
+  }
+  .brand h1 {
+    margin: 0;
+    font-family: var(--heading);
+    font-size: 1.15rem; font-weight: 700;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--gold);
+  }
+  .brand small {
+    font-size: .7rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-dim);
+  }
+  .searchbox { position: relative; }
+  .searchbox svg {
+    position: absolute; left: .85rem; top: 50%;
+    width: 1rem; height: 1rem; margin-top: -.5rem;
+    stroke: var(--ink-dim); fill: none; stroke-width: 2;
+    pointer-events: none;
+  }
   #q {
-    width: 100%; font-size: 1.05rem; padding: .6rem .8rem;
-    border: 1px solid #8884; border-radius: 8px; background: transparent; color: inherit;
+    width: 100%;
+    font-size: 1rem;                 /* ≥16px: stops iOS zoom-on-focus */
+    padding: .7rem 2.4rem .7rem 2.5rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+    -webkit-appearance: none; appearance: none;
   }
-  #latency { font-size: .78rem; opacity: .55; margin: .4rem 0 0; min-height: 1.2em; }
-  .result { border: 1px solid #8883; border-radius: 8px; padding: .8rem 1rem; margin: .8rem 0; }
-  .result h2 { font-size: 1rem; margin: 0; }
-  .path { font-size: .75rem; opacity: .55; margin: .1rem 0 .5rem; }
-  .text { white-space: pre-wrap; margin: 0; }
-  details { margin-top: .5rem; font-size: .9rem; }
-  details summary { cursor: pointer; opacity: .7; }
-  .crops img { max-width: 100%; border: 1px solid #8883; border-radius: 4px; margin-top: .5rem; display: block; }
-  .related { margin-top: .6rem; }
+  #q:focus { border-color: var(--gold-dim); }
+  #q::placeholder { color: var(--ink-dim); }
+  #q::-webkit-search-cancel-button { -webkit-appearance: none; }
+  #clear {
+    position: absolute; right: .35rem; top: 50%; transform: translateY(-50%);
+    border: 0; background: none; color: var(--ink-dim);
+    font-size: 1.15rem; line-height: 1; padding: .45rem .55rem;
+    cursor: pointer; display: none;
+  }
+  #meta {
+    max-width: 720px; margin: .45rem auto 0;
+    font: .72rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--ink-dim); min-height: 1.1em;
+  }
+  #meta b { color: var(--gold); font-weight: 600; }
+
+  /* ---- results ---- */
+  main { max-width: 720px; margin: 0 auto; padding: .9rem 1rem 3rem; }
+  .hint { color: var(--ink-dim); text-align: center; padding: 2.5rem 1rem; font-size: .95rem; }
+  .back {
+    display: inline-block; margin-bottom: .8rem;
+    color: var(--gold); text-decoration: none;
+    font-family: var(--heading); font-size: .85rem;
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  .result {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1rem 1.1rem 1.1rem;
+    margin: 0 0 .9rem;
+  }
+  .result.top { border-left: 3px solid var(--gold); }
+  .result h2 {
+    margin: 0;
+    font-family: var(--heading);
+    font-size: 1.2rem; font-weight: 700;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--gold);
+  }
+  .path {
+    font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-dim); margin: .25rem 0 .7rem;
+  }
+  .path span { color: var(--gold-dim); }
+  .text { white-space: pre-wrap; margin: 0; font-size: 1rem; }
+  mark {
+    background: var(--mark-bg);
+    color: var(--ink);
+    font-weight: 700;
+    border-radius: 3px;
+    padding: 0 .1em;
+    box-shadow: inset 0 -2px 0 var(--gold);
+  }
+  .result h2 mark { color: var(--gold); background: none; }
+
+  details { margin-top: .8rem; }
+  details summary {
+    cursor: pointer; list-style: none;
+    font-family: var(--heading); font-size: .8rem; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-dim);
+    display: flex; align-items: center; gap: .4rem;
+    padding: .2rem 0;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: ""; width: .45em; height: .45em;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg); transition: transform .15s;
+  }
+  details[open] summary::before { transform: rotate(45deg); }
+  details .text { margin-top: .5rem; font-size: .95rem; color: var(--ink); }
+
+  /* crops sit on a light "page" surface so the scan stays readable */
+  .crops figure {
+    margin: .6rem 0 0;
+    background: #f4f1e8;
+    border-radius: 8px;
+    padding: .5rem;
+  }
+  .crops img {
+    display: block; width: 100%; height: auto;
+    border-radius: 4px; cursor: zoom-in;
+  }
+  .crops figcaption {
+    font-size: .7rem; color: #6b6656; text-align: center;
+    padding-top: .35rem; letter-spacing: .06em; text-transform: uppercase;
+  }
+
+  .related { margin-top: .9rem; display: flex; flex-wrap: wrap; gap: .4rem; }
   .related a {
-    display: inline-block; font-size: .78rem; padding: .1rem .5rem; margin: 0 .3rem .3rem 0;
-    border: 1px solid #8885; border-radius: 999px; text-decoration: none; color: inherit;
+    font-family: var(--heading); font-size: .78rem; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: .3rem .7rem;
+    border: 1px solid var(--gold-dim); border-radius: 999px;
+    color: var(--gold); text-decoration: none;
+    background: var(--surface-2);
   }
+  .related a:active { background: var(--gold-dim); color: var(--bg); }
+
+  /* ---- fullscreen image viewer ---- */
+  #lightbox {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(5, 4, 8, .95);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    display: none;
+  }
+  #lightbox.open { display: block; }
+  #lightbox img {
+    display: block; margin: auto;
+    max-width: 100%; padding: 2.5rem .5rem;
+    cursor: zoom-in;
+  }
+  #lightbox img.zoomed { max-width: none; cursor: zoom-out; }
+  #lightbox-close {
+    position: fixed; top: calc(.5rem + env(safe-area-inset-top)); right: .6rem;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--surface); color: var(--ink);
+    font-size: 1.1rem; line-height: 1; padding: .5rem .65rem;
+    cursor: pointer;
+  }
+
+  /* ---- data management ---- */
   #ingest {
-    margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #8883;
-    font-size: .85rem; opacity: .9;
+    margin-top: 2.5rem; border-top: 1px solid var(--line); padding-top: .8rem;
   }
-  #ingest button { padding: .3rem .8rem; border-radius: 6px; border: 1px solid #8885; background: transparent; color: inherit; cursor: pointer; }
-  #ingest-status { margin-top: .4rem; font-size: .78rem; opacity: .65; min-height: 1.2em; }
+  #ingest .row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; align-items: center; }
+  #ingest input[type=file] { font-size: .8rem; color: var(--ink-dim); max-width: 100%; }
+  #ingest button {
+    font-family: var(--heading); font-size: .8rem; font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase;
+    padding: .5rem .9rem; border-radius: 8px;
+    border: 1px solid var(--gold-dim);
+    background: var(--surface-2); color: var(--gold); cursor: pointer;
+  }
+  #ingest-status { margin-top: .5rem; font-size: .78rem; color: var(--ink-dim); min-height: 1.2em; }
+  #ingest-status.error { color: var(--red); }
 </style>
 </head>
 <body>
-<h1>RULEHOUND <small>verbatim rules retrieval</small></h1>
 
-<input id="q" type="search" placeholder="what are the rules for disembarking…" autofocus autocomplete="off">
-<p id="latency"></p>
-<div id="results"></div>
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <h1>Rulehound</h1>
+      <small>verbatim rules retrieval</small>
+    </div>
+    <div class="searchbox">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="disembarking, engagement range, mortal wounds…"
+             autofocus autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button id="clear" aria-label="clear search">✕</button>
+    </div>
+    <div id="meta"></div>
+  </div>
+</header>
 
-<section id="ingest">
-  <input type="file" id="pdf" accept=".pdf">
-  <button id="upload">Upload &amp; build embeddings</button>
-  <button id="rebuild" title="Re-run ingest + embeddings on the last uploaded PDF">Rebuild embeddings</button>
-  <div id="ingest-status"></div>
-</section>
+<main>
+  <div id="results"><p class="hint">Type a rule name or describe a situation —<br>results appear as you type.</p></div>
+
+  <details id="ingest">
+    <summary>Manage rules data</summary>
+    <div class="row">
+      <input type="file" id="pdf" accept=".pdf">
+      <button id="upload">Upload &amp; build</button>
+      <button id="rebuild" title="Re-run ingest + embeddings on the last uploaded PDF">Rebuild</button>
+    </div>
+    <div id="ingest-status"></div>
+  </details>
+</main>
+
+<div id="lightbox" role="dialog" aria-label="page image">
+  <img alt="rule page image">
+  <button id="lightbox-close" aria-label="close">✕</button>
+</div>
 
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => (s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let timer = null, seq = 0;
+let timer = null, seq = 0, lastQuery = "", hlRe = null;
 
+/* ---- keyword highlighting -------------------------------------------- */
+const STOP = new Set(["the","and","for","are","was","can","you","your","not",
+  "what","when","how","who","why","does","with","from","into","that","this",
+  "them","they","its","has","have","had","all","any","may","one","out"]);
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function buildHighlighter(...queries) {
+  const tokens = new Set();
+  for (const q of queries)
+    for (const t of (q || "").toLowerCase().match(/[a-z0-9']{3,}/g) || [])
+      if (!STOP.has(t)) tokens.add(t);
+  const parts = [...tokens].sort((a, b) => b.length - a.length).map(escRe);
+  hlRe = parts.length ? new RegExp(`\\b(?:${parts.join("|")})[a-z0-9']*`, "gi") : null;
+}
+
+/* escape + wrap matches in <mark>, working on the raw text so entities
+   introduced by escaping can never be matched */
+function hl(raw) {
+  raw = raw ?? "";
+  if (!hlRe) return esc(raw);
+  let out = "", last = 0;
+  for (const m of raw.matchAll(hlRe)) {
+    out += esc(raw.slice(last, m.index)) + "<mark>" + esc(m[0]) + "</mark>";
+    last = m.index + m[0].length;
+  }
+  return out + esc(raw.slice(last));
+}
+
+/* ---- search ----------------------------------------------------------- */
 $("q").addEventListener("input", () => {
+  $("clear").style.display = $("q").value ? "block" : "none";
   clearTimeout(timer);
   timer = setTimeout(runSearch, 200);
 });
-$("q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(timer); runSearch(); } });
+$("q").addEventListener("keydown", e => {
+  if (e.key === "Enter") { clearTimeout(timer); runSearch(); $("q").blur(); }
+});
+$("clear").addEventListener("click", () => {
+  $("q").value = "";
+  $("clear").style.display = "none";
+  runSearch();
+  $("q").focus();
+});
 
 async function runSearch() {
   const q = $("q").value.trim();
   const my = ++seq;
-  if (!q) { $("results").innerHTML = ""; $("latency").textContent = ""; return; }
-  const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
-  if (my !== seq) return;
-  const data = await res.json();
-  const l = data.latency_ms;
-  let line = `${l.total} ms total · embed ${l.embed} · keyword ${l.keyword} · vector ${l.vector}`;
-  if (data.corrected_query) line += ` · searched for “${data.corrected_query}”`;
-  $("latency").textContent = line;
+  if (!q) {
+    $("results").innerHTML = "<p class='hint'>Type a rule name or describe a situation —<br>results appear as you type.</p>";
+    $("meta").textContent = "";
+    return;
+  }
+  let data;
+  try {
+    const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+    if (my !== seq) return;
+    data = await res.json();
+  } catch {
+    if (my === seq) $("meta").textContent = "search failed — is the server running?";
+    return;
+  }
+  lastQuery = q;
+  buildHighlighter(q, data.corrected_query);
+  let line = `${data.latency_ms.total} ms`;
+  if (data.corrected_query) line += ` · searched for <b>${esc(data.corrected_query)}</b>`;
+  $("meta").innerHTML = line;
   $("results").innerHTML = data.results.length
-    ? data.results.map(renderResult).join("")
-    : "<p style='opacity:.5'>no matches</p>";
+    ? data.results.map((r, i) => renderResult(r, i === 0)).join("")
+    : "<p class='hint'>No matches.</p>";
 }
 
-function renderResult(r) {
+function renderResult(r, top = false, backLink = false) {
   const related = (r.related || []).map(x =>
     `<a href="#" data-rid="${esc(x.rule_id)}" onclick="return showRule(this.dataset.rid)">${esc(x.title)}</a>`).join("");
-  const crops = (r.crops || []).map(c => `<img loading="lazy" src="${esc(c)}">`).join("");
-  return `<div class="result">
-    <h2>${esc(r.title)}</h2>
-    <div class="path">${esc(r.section_path)}</div>
-    <p class="text">${esc(r.text)}</p>
-    ${r.commentary ? `<details><summary>commentary</summary><p class="text">${esc(r.commentary)}</p></details>` : ""}
-    ${crops ? `<details class="crops" open><summary>page image</summary>${crops}</details>` : ""}
+  const crops = (r.crops || []).map(c => {
+    const m = c.match(/_(\d+)\.png$/);        // crops are named {rule_id}_{page}.png
+    const page = m ? `p. ${m[1]}` : "";
+    return `<figure><img loading="lazy" src="${esc(c)}" alt="page image for ${esc(r.title)}"
+      onclick="openLightbox(this.src)">${page ? `<figcaption>${esc(page)}</figcaption>` : ""}</figure>`;
+  }).join("");
+  const path = (r.section_path || "").split(" > ").map(esc).join(" <span>›</span> ");
+  return `${backLink ? `<a class="back" href="#" onclick="return backToResults()">‹ Back to results</a>` : ""}
+  <article class="result${top ? " top" : ""}">
+    <h2>${hl(r.title)}</h2>
+    <div class="path">${path}</div>
+    <p class="text">${hl(r.text)}</p>
+    ${r.commentary ? `<details><summary>Commentary</summary><p class="text">${hl(r.commentary)}</p></details>` : ""}
+    ${crops ? `<details class="crops" open><summary>Page image</summary>${crops}</details>` : ""}
     ${related ? `<div class="related">${related}</div>` : ""}
-  </div>`;
+  </article>`;
 }
 
 async function showRule(id) {
@@ -98,32 +355,65 @@ async function showRule(id) {
   if (res.ok) {
     const r = await res.json();
     r.related = (r.neighbours?.outgoing || []).slice(0, 4);
-    $("results").innerHTML = renderResult(r);
-    $("latency").textContent = r.rule_id;
+    $("results").innerHTML = renderResult(r, true, Boolean(lastQuery));
+    $("meta").textContent = r.rule_id;
+    window.scrollTo({ top: 0 });
   }
   return false;
 }
 
+function backToResults() {
+  $("q").value = lastQuery;
+  runSearch();
+  return false;
+}
+
+/* ---- fullscreen image viewer ------------------------------------------ */
+function openLightbox(src) {
+  const box = $("lightbox"), img = box.querySelector("img");
+  img.src = src;
+  img.classList.remove("zoomed");
+  box.classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+function closeLightbox() {
+  $("lightbox").classList.remove("open");
+  document.body.style.overflow = "";
+}
+$("lightbox").addEventListener("click", e => {
+  if (e.target.tagName === "IMG") e.target.classList.toggle("zoomed");
+  else closeLightbox();
+});
+$("lightbox-close").addEventListener("click", closeLightbox);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
+
+/* ---- ingest ------------------------------------------------------------ */
+function setIngestStatus(msg, error = false) {
+  const el = $("ingest-status");
+  el.textContent = msg;
+  el.classList.toggle("error", error);
+}
+
 $("upload").addEventListener("click", async () => {
   const f = $("pdf").files[0];
-  if (!f) { $("ingest-status").textContent = "choose a PDF first"; return; }
+  if (!f) { setIngestStatus("choose a PDF first", true); return; }
   const body = new FormData();
   body.append("file", f);
   const res = await fetch("/ingest", { method: "POST", body });
-  $("ingest-status").textContent = res.ok ? "ingest started…" : (await res.json()).detail;
-  if (res.ok) pollIngest();
+  if (res.ok) { setIngestStatus("ingest started…"); pollIngest(); }
+  else setIngestStatus((await res.json()).detail, true);
 });
 
 $("rebuild").addEventListener("click", async () => {
   const res = await fetch("/ingest/rebuild", { method: "POST" });
-  $("ingest-status").textContent = res.ok ? "rebuild started…" : (await res.json()).detail;
-  if (res.ok) pollIngest();
+  if (res.ok) { setIngestStatus("rebuild started…"); pollIngest(); }
+  else setIngestStatus((await res.json()).detail, true);
 });
 
 async function pollIngest() {
   const res = await fetch("/ingest/status");
   const s = await res.json();
-  $("ingest-status").textContent = `${s.state}: ${s.message}`;
+  setIngestStatus(`${s.state}: ${s.message}`, s.state === "error");
   if (s.state === "running") setTimeout(pollIngest, 800);
 }
 </script>
