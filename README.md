@@ -4,7 +4,7 @@ Given a natural-language query like *"what are the rules for disembarking"*,
 return the **verbatim rule text** and **cropped page image** for the matching
 rule(s) in under 300 ms, with cross-referenced rules surfaced alongside.
 Retrieval-first: no LLM anywhere in the hot path. See
-`rulehound design doc` (Draft v1) for the full design this implements.
+[`DESIGN.md`](DESIGN.md) (Draft v1) for the full design this implements.
 
 ## Quickstart
 

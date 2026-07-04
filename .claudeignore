@@ -1,0 +1,18 @@
+# Never read/index Games Workshop IP or the derived data built from it
+# (raw PDF, page renders, crops, the SQLite DB) — see DESIGN.md §11.
+data/
+
+# Generated binary test fixture — regenerate via tests/fixtures/build_fixture.py
+tests/fixtures/*.pdf
+
+# Python noise
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Generated/large, low-value as context
+uv.lock
+.git/
