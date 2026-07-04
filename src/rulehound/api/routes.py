@@ -117,6 +117,7 @@ def health(request: Request) -> dict:
 async def ingest(request: Request, file: UploadFile) -> dict:
     """Upload a rules PDF and (re)build chunks + embeddings from it."""
     state = _state(request)
+    print(f"[ingest] upload & build clicked: {file.filename}")
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="upload a .pdf file")
     dest = state.cfg.paths.raw_dir / Path(file.filename).name
@@ -133,6 +134,7 @@ async def ingest(request: Request, file: UploadFile) -> dict:
 def rebuild(request: Request) -> dict:
     """Re-run ingest (including embeddings) on the most recent uploaded PDF."""
     state = _state(request)
+    print("[ingest] rebuild clicked")
     pdfs = sorted(state.cfg.paths.raw_dir.glob("*.pdf"), key=lambda p: p.stat().st_mtime)
     if not pdfs:
         raise HTTPException(status_code=404, detail="no PDF in data/raw — upload one first")

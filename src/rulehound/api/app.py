@@ -36,6 +36,7 @@ class IngestManager:
 
     def _run(self, pdf_path: Path, force: bool) -> None:
         def log(msg: str) -> None:
+            print(msg)
             self.status["log"].append(msg)
             self.status["message"] = msg
 

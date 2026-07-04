@@ -41,11 +41,12 @@
     border-bottom: 1px solid var(--line);
     padding: calc(.6rem + env(safe-area-inset-top)) 1rem .7rem;
   }
-  .header-inner { max-width: 720px; margin: 0 auto; }
+  .header-inner { max-width: 720px; margin: 0 auto; position: relative; }
   .brand {
-    display: flex; align-items: baseline; gap: .6rem;
+    display: flex; align-items: center; justify-content: space-between; gap: .6rem;
     margin: 0 0 .55rem;
   }
+  .brand-text { display: flex; align-items: baseline; gap: .6rem; }
   .brand h1 {
     margin: 0;
     font-family: var(--heading);
@@ -56,6 +57,15 @@
   .brand small {
     font-size: .7rem; letter-spacing: .08em;
     text-transform: uppercase; color: var(--ink-dim);
+  }
+  #settings-toggle {
+    border: 0; background: none; color: var(--ink-dim);
+    cursor: pointer; padding: .4rem; border-radius: 8px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #settings-toggle svg { width: 1.15rem; height: 1.15rem; stroke: currentColor; fill: none; stroke-width: 1.8; }
+  #settings-toggle:hover, #settings-toggle[aria-expanded="true"] {
+    color: var(--gold); background: var(--surface-2);
   }
   .searchbox { position: relative; }
   .searchbox svg {
@@ -200,12 +210,22 @@
   }
 
   /* ---- data management ---- */
-  #ingest {
-    margin-top: 2.5rem; border-top: 1px solid var(--line); padding-top: .8rem;
+  #ingest-panel {
+    position: absolute; top: calc(100% + .5rem); right: 0;
+    width: min(320px, calc(100vw - 2rem));
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: .9rem 1rem 1rem;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .5);
+    z-index: 20;
   }
-  #ingest .row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; align-items: center; }
-  #ingest input[type=file] { font-size: .8rem; color: var(--ink-dim); max-width: 100%; }
-  #ingest button {
+  #ingest-panel[hidden] { display: none; }
+  #ingest-panel h2 {
+    margin: 0; font-family: var(--heading); font-size: .78rem; font-weight: 600;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-dim);
+  }
+  #ingest-panel .row { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .7rem; align-items: center; }
+  #ingest-panel input[type=file] { font-size: .8rem; color: var(--ink-dim); max-width: 100%; }
+  #ingest-panel button {
     font-family: var(--heading); font-size: .8rem; font-weight: 600;
     letter-spacing: .1em; text-transform: uppercase;
     padding: .5rem .9rem; border-radius: 8px;
@@ -221,8 +241,13 @@
 <header>
   <div class="header-inner">
     <div class="brand">
-      <h1>Rulehound</h1>
-      <small>verbatim rules retrieval</small>
+      <div class="brand-text">
+        <h1>Rulehound</h1>
+        <small>verbatim rules retrieval</small>
+      </div>
+      <button id="settings-toggle" aria-label="manage rules data" aria-expanded="false" title="Manage rules data">
+        <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z"/><path d="M19.6 13a7.7 7.7 0 000-2l1.9-1.5-1.5-2.6-2.3.7a7.8 7.8 0 00-1.7-1l-.4-2.4h-3l-.4 2.4a7.8 7.8 0 00-1.7 1l-2.3-.7-1.5 2.6L8.4 11a7.7 7.7 0 000 2l-1.9 1.5 1.5 2.6 2.3-.7a7.8 7.8 0 001.7 1l.4 2.4h3l.4-2.4a7.8 7.8 0 001.7-1l2.3.7 1.5-2.6L19.6 13z"/></svg>
+      </button>
     </div>
     <div class="searchbox">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -231,21 +256,21 @@
       <button id="clear" aria-label="clear search">✕</button>
     </div>
     <div id="meta"></div>
+
+    <div id="ingest-panel" hidden>
+      <h2>Manage rules data</h2>
+      <div class="row">
+        <input type="file" id="pdf" accept=".pdf">
+        <button id="upload">Upload &amp; build</button>
+        <button id="rebuild" title="Re-run ingest + embeddings on the last uploaded PDF">Rebuild</button>
+      </div>
+      <div id="ingest-status"></div>
+    </div>
   </div>
 </header>
 
 <main>
   <div id="results"><p class="hint">Type a rule name or describe a situation —<br>results appear as you type.</p></div>
-
-  <details id="ingest">
-    <summary>Manage rules data</summary>
-    <div class="row">
-      <input type="file" id="pdf" accept=".pdf">
-      <button id="upload">Upload &amp; build</button>
-      <button id="rebuild" title="Re-run ingest + embeddings on the last uploaded PDF">Rebuild</button>
-    </div>
-    <div id="ingest-status"></div>
-  </details>
 </main>
 
 <div id="lightbox" role="dialog" aria-label="page image">
@@ -388,6 +413,21 @@ $("lightbox-close").addEventListener("click", closeLightbox);
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeLightbox(); });
 
 /* ---- ingest ------------------------------------------------------------ */
+const settingsBtn = $("settings-toggle");
+const ingestPanel = $("ingest-panel");
+function setPanelOpen(open) {
+  ingestPanel.hidden = !open;
+  settingsBtn.setAttribute("aria-expanded", String(open));
+}
+settingsBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  setPanelOpen(ingestPanel.hidden);
+});
+document.addEventListener("click", e => {
+  if (!ingestPanel.hidden && !ingestPanel.contains(e.target)) setPanelOpen(false);
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") setPanelOpen(false); });
+
 function setIngestStatus(msg, error = false) {
   const el = $("ingest-status");
   el.textContent = msg;
